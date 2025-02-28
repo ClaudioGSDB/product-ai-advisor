@@ -17,27 +17,8 @@ export default function Home() {
 		setProductQuery(query);
 		setBudget(budgetAmount);
 
-		if (budgetAmount > 0) {
-			const validation = await validateBudget(query, budgetAmount);
-			setBudgetFeedback(validation);
-
-			if (validation.startsWith("LOW")) {
-				const suggestedMinimum = validation.match(/\$(\d+)/)?.[1];
-				if (suggestedMinimum) {
-					setBudgetFeedback(
-						`Your budget of $${budgetAmount} is lower than typical for this product. Most ${query} start around $${suggestedMinimum}.`
-					);
-				} else {
-					setBudgetFeedback(
-						`Your budget of $${budgetAmount} is lower than typical for this product.`
-					);
-				}
-				return;
-			}
-		}
 		const generatedQuestions = await generateQuestions(query, budgetAmount);
 		setQuestions(generatedQuestions);
-
 		setStep("questions");
 	};
 
