@@ -1,17 +1,20 @@
+// src/components/landing/SearchInput.tsx
 import { useState } from "react";
 
 interface SearchInputProps {
 	onSearch: (query: string, budget: number) => void;
+	isLoading?: boolean; // Add this prop
 }
 
-export default function SearchInput({ onSearch }: SearchInputProps) {
+export default function SearchInput({
+	onSearch,
+	isLoading = false,
+}: SearchInputProps) {
 	const [query, setQuery] = useState("");
 	const [budget, setBudget] = useState("");
-	const [isLoading, setIsLoading] = useState(false);
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
-		setIsLoading(true);
 		onSearch(query, parseInt(budget) || 0);
 	};
 
