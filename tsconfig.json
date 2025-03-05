@@ -27,7 +27,7 @@
 		"**/*.ts",
 		"**/*.tsx",
 		".next/types/**/*.ts",
-		"src/components/landing/follow-up-questions"
+		"src/components/searchInput/follow-up-questions"
 	],
 	"exclude": ["node_modules"]
 }

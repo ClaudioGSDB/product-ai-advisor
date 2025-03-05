@@ -1,10 +1,8 @@
 "use client";
 import { useState } from "react";
-import {
-	validateBudget,
-	generateQuestions,
-} from "@/services/ai-service/ai-service";
-import SearchInput from "../components/landing/SearchInput";
+import { validateBudget, generateQuestions } from "@/services/ai-service/ai-service";
+import SearchInput from "@/components/searchInput/SearchInput";
+import Questions from "@/components/questions/Questions";
 
 export default function Home() {
 	const [step, setStep] = useState("search"); // 'search', 'questions', 'results'
@@ -20,6 +18,10 @@ export default function Home() {
 		const generatedQuestions = await generateQuestions(query, budgetAmount);
 		setQuestions(generatedQuestions);
 		setStep("questions");
+	};
+
+	const handleFormSubmit = async (answers: Record<string, string>) => {
+		setStep("results");
 	};
 
 	return (
@@ -40,22 +42,17 @@ export default function Home() {
 						)}
 
 						<p className="mb-6">
-							To help you find the best options, please answer
-							these questions:
+							To help you find the best options, please answer these
+							questions:
 						</p>
 
 						{/* Here we'll add the questions component */}
-						<pre className="bg-gray-100 p-4 rounded">
-							{JSON.stringify(questions, null, 2)}
-						</pre>
-
-						{/* For now, just a placeholder */}
-						<button
-							className="mt-6 w-full p-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-							onClick={() => setStep("results")}
-						>
-							Find Recommendations
-						</button>
+						<div className="bg-gray-100 p-4 rounded">
+							<Questions
+								questionsList={questions}
+								onSubmit={handleFormSubmit}
+							/>
+						</div>
 					</div>
 				)}
 
