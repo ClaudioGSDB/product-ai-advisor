@@ -10,13 +10,20 @@ import {
 import SearchInput from "@/components/searchInput/SearchInput";
 import Questions from "@/components/questions/Questions";
 
+// Define interfaces for our data types
+interface ProductRecommendation {
+	product: any;
+	score: number;
+	reasons: string[];
+}
+
 export default function Home() {
 	const [step, setStep] = useState("search"); // 'search', 'questions', 'results'
 	const [productQuery, setProductQuery] = useState("");
 	const [budget, setBudget] = useState(0);
 	const [budgetFeedback, setBudgetFeedback] = useState("");
-	const [questions, setQuestions] = useState([]);
-	const [recommendations, setRecommendations] = useState([]);
+	const [questions, setQuestions] = useState<any[]>([]);
+	const [recommendations, setRecommendations] = useState<ProductRecommendation[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [optimizedQuery, setOptimizedQuery] = useState("");
 	const [error, setError] = useState("");
