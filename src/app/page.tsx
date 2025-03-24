@@ -25,7 +25,6 @@ export default function Home() {
 	const [questions, setQuestions] = useState<any[]>([]);
 	const [recommendations, setRecommendations] = useState<ProductRecommendation[]>([]);
 	const [loading, setLoading] = useState(false);
-	const [optimizedQuery, setOptimizedQuery] = useState("");
 	const [error, setError] = useState("");
 
 	const handleSearch = async (query: string, budgetAmount: number) => {
@@ -54,7 +53,6 @@ export default function Home() {
 				5 // Get top 5 recommendations
 			);
 
-			setOptimizedQuery(result.optimizedQuery);
 			setRecommendations(result.recommendations || []);
 			setLoading(false);
 			setStep("results");
@@ -216,15 +214,6 @@ export default function Home() {
 										</div>
 									);
 								})}
-
-								{optimizedQuery && (
-									<div className="mt-4 p-3 bg-gray-100 rounded text-sm text-gray-600">
-										<p>
-											<strong>Search query used:</strong> "
-											{optimizedQuery}"
-										</p>
-									</div>
-								)}
 							</>
 						)}
 

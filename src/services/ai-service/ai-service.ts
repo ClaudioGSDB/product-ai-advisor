@@ -83,101 +83,6 @@ export async function generateQuestions(productQuery: string, budget: number) {
 }
 
 /**
- * Generate an optimized search query for Walmart based on user requirements
- * @param productQuery The original product query
- * @param budget The user's budget (if any)
- * @param userRequirements The user's answers to questions
- * @returns Optimized search parameters
- */
-export async function generateSearchQuery(
-	productQuery: string,
-	budget: number | null,
-	userRequirements: Record<string, string>
-): Promise<{
-	searchQuery: string;
-	sortStrategy?: "relevance" | "price" | "customerRating" | "bestseller";
-	sortOrder?: "ascending" | "descending";
-}> {
-	try {
-		const model = genAI.getGenerativeModel({
-			model: "gemini-1.5-flash",
-		});
-
-		// Create a detailed prompt for Gemini
-		const prompt = `
-		You are an expert shopping assistant. Your job is to create the most effective search query for Walmart's product search based on a user's requirements.
-
-		User is looking for: "${productQuery}"
-		${budget ? `Budget: $${budget}` : "No specific budget provided"}
-		
-		User requirements based on questions and answers:
-		${Object.entries(userRequirements)
-			.map(
-				([question, answer]) => `- Question: "${question}"\n  Answer: "${answer}"`
-			)
-			.join("\n")}
-		
-		Based on this information, create a search query that would find the most relevant products on Walmart.
-		The query should include the product type and the most important specifications/requirements.
-		
-		Keep the query concise but specific (5-10 words). Focus on the most important requirements.
-		Do not include price in the query itself.
-		
-		Also recommend the best sort strategy:
-		- "relevance" (default) - best for general searches
-		- "price" - best when budget is the main concern
-		- "customerRating" - best when quality is the main concern
-		- "bestseller" - best for popular, tried-and-tested products
-		
-		If "price" is selected, also specify sort order ("ascending" or "descending").
-		
-		Format your response as a JSON object:
-		{
-			"searchQuery": "your optimized search query",
-			"sortStrategy": "one of the strategies above",
-			"sortOrder": "ascending or descending (only if sortStrategy is price)"
-		}
-		
-		Return ONLY the JSON object, no additional text.
-		`;
-
-		const result = await model.generateContent(prompt);
-		const responseText = result.response.text();
-
-		// Try to parse the JSON response
-		try {
-			// Find and extract the JSON object from the response
-			const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-
-			if (jsonMatch) {
-				const parsedResponse = JSON.parse(jsonMatch[0]);
-				return parsedResponse;
-			} else {
-				throw new Error("Failed to extract JSON from AI response");
-			}
-		} catch (parseError) {
-			console.error("Error parsing AI response:", parseError);
-			console.log("Raw AI response:", responseText);
-
-			// Return a fallback response using the original query
-			return {
-				searchQuery: productQuery,
-				sortStrategy: budget ? "price" : "relevance",
-				sortOrder: budget ? "ascending" : undefined,
-			};
-		}
-	} catch (error) {
-		console.error("Error generating search query:", error);
-
-		// Return a fallback response
-		return {
-			searchQuery: productQuery,
-			sortStrategy: "relevance",
-		};
-	}
-}
-
-/**
  * Rank and filter products based on user requirements
  * @param products List of products from the search results
  * @param userRequirements User's answers to questions
@@ -188,86 +93,63 @@ export async function rankProducts(
 	products: any[],
 	userRequirements: Record<string, string>,
 	maxResults: number = 5
-): Promise<
-	Array<{
-		product: any;
-		score: number;
-		reasons: string[];
-	}>
-> {
+): Promise<Array<{ product: any; score: number; reasons: string[] }>> {
 	try {
-		// If no products, return empty array
-		if (!products || products.length === 0) {
-			return [];
-		}
+		const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-		// If only a few products, just sort by customer rating
-		if (products.length <= maxResults) {
-			return products
-				.map((product) => ({
-					product,
-					score: parseFloat(product.customerRating || "0") * 20, // Convert 0-5 to 0-100
-					reasons: ["Best available option based on your requirements"],
-				}))
-				.sort((a, b) => b.score - a.score);
-		}
-
-		// For more products, use AI to rank them
-		const model = genAI.getGenerativeModel({
-			model: "gemini-1.5-flash",
-		});
-
-		// Create simplified product representation for the AI
-		const simplifiedProducts = products.slice(0, 15).map((product, index) => ({
-			id: index,
-			name: product.name,
-			price: product.salePrice,
-			brand: product.brandName || "Unknown",
-			rating: product.customerRating || "0",
-			reviewCount: product.numReviews || 0,
-			description: product.shortDescription || "",
-		}));
-
+		// Create product analysis prompt
 		const prompt = `
-		You are an expert shopping assistant. Rank these products based on the user's requirements:
-		
-		User requirements:
-		${Object.entries(userRequirements)
+	  You are an expert shopping advisor. Analyze these products and rank how well they match the user's needs.
+  
+	  User Requirements:
+	  ${Object.entries(userRequirements)
+			.map(([question, answer]) => `- ${question}: ${answer}`)
+			.join("\n")}
+  
+	  Products to analyze (showing key details for each):
+	  ${products
+			.slice(0, 15)
 			.map(
-				([question, answer]) => `- Question: "${question}"\n  Answer: "${answer}"`
+				(product, idx) => `
+	  Product ${idx + 1}:
+	  - Name: ${product.name}
+	  - Price: $${product.salePrice}
+	  - Brand: ${product.brandName || "Unknown"}
+	  - Rating: ${product.customerRating || "N/A"} (${product.numReviews || 0} reviews)
+	  - Key Features: ${product.shortDescription || "N/A"}
+	  `
 			)
 			.join("\n")}
-		
-		Here are the products to rank:
-		${JSON.stringify(simplifiedProducts, null, 2)}
-		
-		For each product, assign a score (1-100) based on how well it matches the user's requirements.
-		Also provide 2-3 specific reasons why each product is or isn't a good match.
-		
-		Format your response as a JSON array of objects:
-		[
-			{
-				"id": 0,
-				"score": 85,
-				"reasons": ["Reason 1", "Reason 2"]
-			},
-			...
-		]
-		
-		Sort the products by score (highest first).
-		Return ONLY the JSON array, no additional text.
-		`;
+  
+	  For each product, analyze:
+	  1. How well it matches the specific requirements
+	  2. Quality and reliability for the intended use
+	  3. Value for the features provided
+  
+	  Return a JSON array of the best matches, with scoring and specific reasons:
+	  [
+		{
+		  "id": 0, // product index
+		  "score": 95, // 0-100 match score
+		  "reasons": [
+			"Specific reason this matches their needs",
+			"Another specific benefit for their use case"
+		  ]
+		}
+	  ]
+  
+	  Include only products that are genuinely good matches. Order by best match first.
+	  Return ONLY the JSON array, no other text.`;
 
 		const result = await model.generateContent(prompt);
 		const responseText = result.response.text();
 
 		try {
 			const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-
 			if (jsonMatch) {
 				const rankedProducts = JSON.parse(jsonMatch[0]);
 
-				// Map back to full product objects
+				// Map back to full product data and sort by score
 				return rankedProducts
 					.map((item: any) => ({
 						product: products[item.id],
@@ -276,39 +158,23 @@ export async function rankProducts(
 					}))
 					.sort((a: any, b: any) => b.score - a.score)
 					.slice(0, maxResults);
-			} else {
-				throw new Error("Failed to extract JSON from AI response");
 			}
 		} catch (error) {
-			console.error("Error parsing product ranking:", error);
-
-			// Fallback: sort by a combination of customer rating and review count
-			return products
-				.map((product) => {
-					const rating = parseFloat(product.customerRating || "0");
-					const reviewCount = product.numReviews || 0;
-					// Score formula: rating (0-5) * 10 + log of review count (to reduce impact of very high counts)
-					const score =
-						rating * 10 +
-						(reviewCount > 0 ? Math.log10(reviewCount) * 10 : 0);
-
-					return {
-						product,
-						score,
-						reasons: ["Based on customer ratings and popularity"],
-					};
-				})
-				.sort((a, b) => b.score - a.score)
-				.slice(0, maxResults);
+			console.error("Error parsing AI response:", error);
 		}
-	} catch (error) {
-		console.error("Error ranking products:", error);
 
-		// Fallback: just take the first N products
+		// Fallback: Return top rated products with generic reasons
 		return products.slice(0, maxResults).map((product) => ({
 			product,
-			score: 50,
-			reasons: ["Recommended product for your needs"],
+			score: 70,
+			reasons: ["Matches your general requirements"],
+		}));
+	} catch (error) {
+		console.error("Error ranking products:", error);
+		return products.slice(0, maxResults).map((product) => ({
+			product,
+			score: 70,
+			reasons: ["Matches your general requirements"],
 		}));
 	}
 }

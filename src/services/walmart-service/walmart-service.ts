@@ -1,6 +1,6 @@
 //service for fetching product data from walmart api
 
-import { generateSearchQuery, rankProducts } from "@/services/ai-service/ai-service";
+import { rankProducts } from "@/services/ai-service/ai-service";
 
 export async function fetchTrendingProducts() {
 	try {
@@ -23,35 +23,13 @@ export async function searchProducts(
 	userRequirements: Record<string, string>
 ) {
 	try {
-		// Step 1: Generate optimized search query using AI
-		console.log("Generating search query...");
-		const searchParams = await generateSearchQuery(
-			productQuery,
-			budget,
-			userRequirements
-		);
+		// Build simple search endpoint - focus on getting relevant candidates
+		const endpoint = `api-proxy/service/affil/product/v2/search?query=${encodeURIComponent(
+			productQuery
+		)}&numItems=25`;
 
-		// Step 2: Build API endpoint with search parameters
-		let endpoint = `api-proxy/service/affil/product/v2/search?query=${encodeURIComponent(
-			searchParams.searchQuery
-		)}`;
+		console.log("Searching with endpoint:", endpoint);
 
-		// Add sort parameters if specified
-		if (searchParams.sortStrategy && searchParams.sortStrategy !== "relevance") {
-			endpoint += `&sort=${searchParams.sortStrategy}`;
-
-			// Add sort order for price sorting
-			if (searchParams.sortStrategy === "price" && searchParams.sortOrder) {
-				endpoint += `&order=${searchParams.sortOrder}`;
-			}
-		}
-
-		// Set number of items to return (max 25)
-		endpoint += "&numItems=25";
-
-		console.log("Search endpoint:", endpoint);
-
-		// Step 3: Make the API request
 		const response = await fetch(
 			`/api/walmart?endpoint=${encodeURIComponent(endpoint)}`
 		);
@@ -61,30 +39,18 @@ export async function searchProducts(
 		}
 
 		const data = await response.json();
-		console.log(`Found ${data.totalResults || 0} search results`);
+		let products = data.items || [];
 
-		// Step 4: Filter products by budget if specified
-		let filteredProducts = data.items || [];
-
-		if (budget && filteredProducts.length > 0) {
-			// Allow products slightly over budget (10%)
-			const maxPrice = budget * 1.1;
-
-			// Filter out products that exceed the max price
-			const withinBudget = filteredProducts.filter(
-				(product: any) => product.salePrice <= maxPrice
+		// Do basic budget filtering if specified
+		if (budget && products.length > 0) {
+			products = products.filter(
+				(product: any) => product.salePrice <= budget * 1.1
 			);
-
-			// Only use budget filtering if it doesn't eliminate all products
-			if (withinBudget.length > 0) {
-				filteredProducts = withinBudget;
-			}
 		}
 
 		return {
-			query: searchParams.searchQuery,
-			products: filteredProducts,
-			totalResults: filteredProducts.length,
+			products,
+			totalResults: products.length,
 			originalQuery: productQuery,
 		};
 	} catch (error) {
@@ -113,7 +79,6 @@ export async function getRecommendedProducts(
 			return {
 				products: [],
 				originalQuery: productQuery,
-				optimizedQuery: searchResults.query,
 			};
 		}
 
@@ -129,7 +94,6 @@ export async function getRecommendedProducts(
 		return {
 			recommendations: rankedProducts,
 			originalQuery: productQuery,
-			optimizedQuery: searchResults.query,
 			totalResults: searchResults.totalResults,
 		};
 	} catch (error) {
